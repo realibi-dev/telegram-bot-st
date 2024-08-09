@@ -1,0 +1,19 @@
+{
+  "name": "st-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@pspdfkit/nodejs": "^0.0.5",
+    "aspose.cells": "^24.7.0",
+    "moment": "^2.30.1",
+    "node-telegram-bot-api": "^0.66.0",
+    "pg": "^8.12.0",
+    "write-excel-file": "^2.0.4"
+  }
+}
