@@ -3,7 +3,6 @@ const moment = require('moment');
 const fs = require('fs');
 const writeXlsxFile = require('write-excel-file/node')
 const pg = require('pg');
-const url = require('url');
 const path = require('path');
 const { Client } = pg
 const token = '7387625761:AAGBsl5fo5-0_bld8Mq_IlJ1AgVEjoEcOHg';
@@ -40,7 +39,7 @@ client.connect().then(() => {
                 join orders_order oo on oo.id = oi.order_id
                 where oi.product_id = p.id and
                 oi.product_id in (26, 27, 52) and
-                oo.restaurant_branch_id in (113, 114,   214, 215, 216, 127, 108, 109, 111, 113,     10, 11, 12, 13, 14, 281,    4,     77, 235,331,     120, 212, 233, 279, 298, 310, 332, 366) and
+                oo.restaurant_branch_id in (113, 114,   214, 215, 216, 127, 108, 109, 111, 113,    10, 11, 12, 13, 14, 281,    4,     77, 235,331,     120, 212, 233, 279, 298, 310, 332, 366, 158, 397) and
                 cast(oo.created_at as TIMESTAMP) > cast(concat(CURRENT_DATE, ' 00:00:00') as TIMESTAMP) and
                 cast(oo.created_at as TIMESTAMP) < cast(concat(CURRENT_DATE, ' 23:59:59') as TIMESTAMP)
             ), 0) as sklad_french,
