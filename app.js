@@ -39,7 +39,7 @@ client.connect().then(() => {
                 join orders_order oo on oo.id = oi.order_id
                 where oi.product_id = p.id and
                 oi.product_id in (26, 27, 52) and
-                oo.restaurant_branch_id in (113, 114,   214, 215, 216, 127, 108, 109, 111, 113,    10, 11, 12, 13, 14, 281,    4,     77, 235,331,     120, 212, 233, 279, 298, 310, 332, 366, 158, 397) and
+                oo.restaurant_branch_id in (113, 114,   214, 215, 216, 127, 108, 109, 111, 113,    10, 11, 12, 13, 14, 281,    4,5,6,7,8,236,     77, 235,331,     120, 212, 233, 279, 298, 310, 332, 366, 158, 397) and
                 cast(oo.created_at as TIMESTAMP) > cast(concat(CURRENT_DATE, ' 00:00:00') as TIMESTAMP) and
                 cast(oo.created_at as TIMESTAMP) < cast(concat(CURRENT_DATE, ' 23:59:59') as TIMESTAMP)
             ), 0) as sklad_french,
@@ -158,7 +158,7 @@ client.connect().then(() => {
                 join orders_order oo on oo.id = oi.order_id
                 where oi.product_id = p.id and
                 oi.product_id in (26, 27, 52) and
-                oo.restaurant_branch_id in (113, 114,    214, 215, 216, 127, 108, 109, 111, 113,     10, 11, 12, 13, 14, 281,    4,     77, 235,331,     120, 212, 233, 279, 298, 310, 332, 366) and
+                oo.restaurant_branch_id in (113, 114,    214, 215, 216, 127, 108, 109, 111, 113,     10, 11, 12, 13, 14, 281,    4,5,6,7,8,236,     77, 235,331,     120, 212, 233, 279, 298, 310, 332, 366) and
                 cast(oo.created_at as TIMESTAMP) > cast(concat(CURRENT_DATE, ' 00:00:00') as TIMESTAMP) and
                 cast(oo.created_at as TIMESTAMP) < cast(concat(CURRENT_DATE, ' 23:59:59') as TIMESTAMP)
             ), 0) - COALESCE((
@@ -329,7 +329,7 @@ client.connect().then(() => {
 
                                     for (const product of branchProducts) {
                                         if (
-                                            ([113, 114,   214, 215, 216, 127, 108, 109, 111, 113, 10, 11, 12, 13, 14, 281, 4, 77, 235,331, 120, 212, 233, 279, 298, 310, 332, 366].includes(+product.rest_branch_id) &&
+                                            ([113, 114,   214, 215, 216, 127, 108, 109, 111, 113, 10, 11, 12, 13, 14, 281, 4,5,6,7,8,236, 77, 235,331, 120, 212, 233, 279, 298, 310, 332, 366].includes(+product.rest_branch_id) &&
                                             [26, 27, 52].includes(+product.product_id)) ||
                                             ((product.product_id == 161) &&
                                             ([113, 114,   108, 109, 110, 111, 112, 127, 158, 215, 216, 214].includes(+product.rest_branch_id)))
@@ -421,7 +421,218 @@ client.connect().then(() => {
         } else {
             bot.sendMessage(chatId, 'Неверный формат сообщения, нужно написать в формате "nak [название поставщика]"');
         }
-      } else if (msg.text.split(' ').length) {
+      } else if (msg.text.toLowerCase().includes('наклад')) {
+        client.query('select id, name from products_productprovider')
+            .then(res => {
+                client.query(`
+                    select oo.order_number, au.username, p.id as product_id, p.name as product_name, oi.quantity, oi.price, rb.id as rest_branch_id, rb.name as rest_name, rb.address as rest_address, rb.contact_phone, p.provider_id, prov.name as provider_name,
+                    (
+                        select sum(oi.quantity) from orders_orderitem oi
+                        join products_product p on p.id = oi.product_id
+                        where p.provider_id = p.provider_id and oi.order_id = oo.id
+                    ) as total_food_count, oo.created_at
+                    from orders_order oo
+                    join profiles_restaurantbranch rb on rb.id = oo.restaurant_branch_id
+                    join orders_orderitem oi on oi.order_id = oo.id
+                    join products_product p on p.id = oi.product_id
+                    join auth_user au on au.id = oo.user_id
+                    join products_productprovider prov on p.provider_id = prov.id
+                    where
+                    cast(oo.created_at as TIMESTAMP) > cast(concat(CURRENT_DATE, ' 00:00:00') as TIMESTAMP) and
+                    cast(oo.created_at as TIMESTAMP) < cast(concat(CURRENT_DATE, ' 21:00:00') as TIMESTAMP) and
+                    (
+                        select count(oi.id) from orders_orderitem oi
+                        join products_product p on p.id = oi.product_id
+                        where p.provider_id = p.provider_id and oi.order_id = oo.id
+                    ) > 0
+                `)
+                .then(res => {
+                    
+                    const allProducts = res.rows;
+                    const providerIds = [...new Set(allProducts.map(item => item.provider_id))];
+
+                    for (let providerId of providerIds) {
+                        const products = allProducts.filter(product => product.provider_id == providerId);
+                        if (products.length) {
+                            const restaurantBranchIds = [...new Set(products.map(product => product?.rest_branch_id))];
+
+                            const EXCELL_TOTAL_SHEETS = [];
+                            const EXCELL_TOTAL_SHEETS_NAMES = [];
+                            const EXCELL_TOTAL_COLUMNS = [];
+                            
+                            for (const branchId of restaurantBranchIds) {
+                                const branchProducts = products.filter(product => product.rest_branch_id === branchId);
+
+                                const EXCELL_1_ROW = [
+                                    {
+                                        value: 'Номер заказа',
+                                        fontWeight: 'bold',
+                                        width: 100,
+                                    },
+                                    {
+                                        value: branchProducts[0].order_number,
+                                        width: 10,
+                                    }
+                                ];
+
+                                const EXCELL_2_ROW = [
+                                    {
+                                        value: 'Пользователь',
+                                        fontWeight: 'bold',
+                                        width: 15,
+                                    },
+                                    {
+                                        value: branchProducts[0].username,
+                                        width: 30,
+                                    }
+                                ];
+
+                                const EXCELL_3_ROW = [
+                                    {
+                                        value: 'Ресторан',
+                                        fontWeight: 'bold',
+                                        width: 60,
+                                    },
+                                    {
+                                        value: branchProducts[0].rest_name + ' - ' + branchProducts[0].rest_address,
+                                        width: 60,
+                                    }
+                                ];
+
+                                const EXCELL_4_ROW = [
+                                    {
+                                        value: 'Дата создания',
+                                        fontWeight: 'bold',
+                                        width: 20,
+                                    },
+                                    {
+                                        value: moment(branchProducts[0].created_at).add(1, 'days').format("YYYY-MM-DD"),
+                                        width: 15,
+                                    }
+                                ];
+
+                                const EXCELL_5_ROW = [
+                                    {
+                                        value: '#',
+                                        fontWeight: 'bold',
+                                    },
+                                    {
+                                        value: 'Наименование',
+                                        fontWeight: 'bold',
+                                        width: 300,
+                                    },
+                                    {
+                                        value: 'Количество',
+                                        fontWeight: 'bold',
+                                        width: 30,
+                                    },
+                                    {
+                                        value: 'Цена',
+                                        fontWeight: 'bold',
+                                        width: 15,
+                                    },
+                                    {
+                                        value: 'Сумма',
+                                        fontWeight: 'bold',
+                                        width: 15,
+                                    },
+                                ];
+
+                                const EXCELL_ROWS_ARRAY = [EXCELL_1_ROW, EXCELL_2_ROW, EXCELL_3_ROW, EXCELL_4_ROW, EXCELL_5_ROW];
+
+                                let totalBranchProductsCount = 0;
+                                let totalBranchProductsPrice = 0;
+                                let orderNumber = 1;
+
+                                // console.log(branchProducts)
+
+                                for (const product of branchProducts) {
+                                    if (
+                                        ([113, 114,   214, 215, 216, 127, 108, 109, 111, 113, 10, 11, 12, 13, 14, 281, 4,5,6,7,8,236, 77, 235,331, 120, 212, 233, 279, 298, 310, 332, 366].includes(+product.rest_branch_id) &&
+                                        [26, 27, 52].includes(+product.product_id)) ||
+                                        ((product.product_id == 161) &&
+                                        ([113, 114,   108, 109, 110, 111, 112, 127, 158, 215, 216, 214].includes(+product.rest_branch_id)))
+                                    ) {
+                                        
+                                    } else {
+                                        EXCELL_ROWS_ARRAY.push([
+                                            {
+                                                value: orderNumber,
+                                            },
+                                            {
+                                                value: product.product_name,
+                                            },
+                                            {
+                                                value: product.quantity,
+                                            },
+                                            {
+                                                value: product.price,
+                                            },
+                                            {
+                                                value: product.price * product.quantity,
+                                            },
+                                        ]);
+
+                                        totalBranchProductsCount += product.quantity;
+                                        totalBranchProductsPrice += product.price * product.quantity;
+                                        orderNumber++;
+                                    }
+                                }
+
+                                EXCELL_ROWS_ARRAY.push([
+                                    {
+                                        value: null,
+                                    },
+                                    {
+                                        value: 'Итого',
+                                    },
+                                    {
+                                        value: totalBranchProductsCount,
+                                    },
+                                    {
+                                        value: null,
+                                    },
+                                    {
+                                        value: totalBranchProductsPrice,
+                                    },
+                                ]);
+
+                                EXCELL_TOTAL_SHEETS_NAMES.push(branchProducts[0].rest_address.substring(0, 29).replaceAll('/', '-'));
+                                EXCELL_TOTAL_SHEETS.push(EXCELL_ROWS_ARRAY);
+                                EXCELL_TOTAL_COLUMNS.push([
+                                    { width: 15 },
+                                    { width: 50 },
+                                    { width: 12 },
+                                    { width: 10 },
+                                    { width: 10 },
+                                ]);
+                            }
+
+                            const excellFilePath = path.join(__dirname, `Накладные-${products[0].provider_name.replaceAll(':', ' ').replaceAll(' ', '_').replaceAll('"', '')}-${moment().add(1, 'days').format("YYYY_MM_DD")}-${Math.round(Math.random()*100000)}.xlsx`);
+                            fs.writeFile(excellFilePath, '', () => {
+                                writeXlsxFile(
+                                    EXCELL_TOTAL_SHEETS,
+                                    {
+                                        sheets: EXCELL_TOTAL_SHEETS_NAMES,
+                                        columns: EXCELL_TOTAL_COLUMNS,
+                                        filePath: excellFilePath,
+                                    },
+                                )
+                                .then(() => {
+                                    const fileBuffer = fs.readFileSync(excellFilePath);
+
+                                    bot.sendDocument(chatId, fileBuffer, {}, {
+                                        filename: `Накладные-${products[0].provider_name.replaceAll('Поставщик', '').replaceAll(':', ' ').replaceAll(' ', '_').replaceAll('"', '')}-${moment().add(1, 'days').format("YYYY_MM_DD")}-${Math.round(Math.random()*100000)}.xlsx`,
+                                        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                    }); 
+                                })
+                            })
+                        }
+                    }
+                })
+            })
+      }
+      else if (msg.text.split(' ').length) {
         const username = msg.text.split(' ')[1];
         bot.sendMessage(chatId, "Секунду...");
   
